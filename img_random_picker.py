@@ -13,42 +13,47 @@ def sample_images_per_folder(
     seed: int | None = None,
 ):
     if not target_dir:
-        raise ValueError("環境変数 TARGET_DIR が設定されていません。.env を確認してください。")
+        raise ValueError(
+            "環境変数 TARGET_DIR が設定されていません。.env を確認してください。"
+        )
 
     target_root = Path(target_dir).resolve()
     if not target_root.exists():
         raise FileNotFoundError(f"指定されたフォルダが見つかりません: {target_root}")
 
     output_root = Path(output_dir).resolve()
-    output_root.mkdir(parents=True, exist_ok=True)
 
     if seed is not None:
         random.seed(seed)
 
     target_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
     folder_count = 0
+    skipped_count = 0
     total_copied = 0
 
     # 各階層フォルダを走査し、画像が含まれるフォルダごとにランダム抽出
     for dirpath, _, filenames in sorted(os.walk(target_root)):
         current_dir = Path(dirpath)
         images = sorted(
-            current_dir / f
-            for f in filenames
-            if Path(f).suffix.lower() in target_exts
+            current_dir / f for f in filenames if Path(f).suffix.lower() in target_exts
         )
 
         if not images:
             continue
 
-        k = min(samples_per_folder, len(images))
-        picked_images = random.sample(images, k)
-
         if preserve_hierarchy:
             rel_dir = current_dir.relative_to(target_root)
             dest_dir = output_root / rel_dir
+
+            # すでに保存先ディレクトリが存在する場合はスキップ
+            if dest_dir.exists():
+                skipped_count += 1
+                continue
         else:
             dest_dir = output_root
+
+        k = min(samples_per_folder, len(images))
+        picked_images = random.sample(images, k)
 
         dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -59,7 +64,10 @@ def sample_images_per_folder(
 
         folder_count += 1
 
-    print(f"完了: {folder_count}個のフォルダから計 {total_copied}枚 を '{output_root}' にコピーしました。")
+    print(
+        f"完了: {folder_count}個のフォルダから計 {total_copied}枚 を '{output_root}' にコピーしました。"
+        f"（スキップ: {skipped_count}フォルダ）"
+    )
 
 
 if __name__ == "__main__":
@@ -75,5 +83,5 @@ if __name__ == "__main__":
         output_dir=OUTPUT_DIR,
         samples_per_folder=3,
         preserve_hierarchy=True,  # Roboflow等へ一括投入するため1フォルダにまとめたい場合は False に変更
-        seed=42,                  # 毎回違うランダム結果にしたい場合は None に変更
+        seed=42,  # 毎回違うランダム結果にしたい場合は None に変更
     )
